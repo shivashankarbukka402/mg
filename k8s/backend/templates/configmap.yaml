@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  labels:
+    {{- include "backend.labels" . | nindent 4 }}
+data:
+  mongo-host: {{ .Values.env.mongoHost | quote }}
+  mongo-port: {{ .Values.env.mongoPort | quote }}
+  cors-origin: {{ .Values.env.corsOrigin | quote }}

@@ -1,0 +1,28 @@
+replicaCount: 1
+
+image:
+  repository: mongo
+  tag: "6.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 27017
+  targetPort: 27017
+
+storage:
+  className: ebs-mongo
+  size: 4Gi
+
+secret:
+  rootUsername: admin
+  rootPassword: password
+  authDatabase: admin
+
+storageClass:
+  name: ebs-mongo
+  type: gp2
+  fsType: ext4
+  reclaimPolicy: Retain
+  allowVolumeExpansion: true
+

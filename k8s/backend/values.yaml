@@ -1,0 +1,53 @@
+replicaCount: 2
+
+image:
+  repository: shiva9828/backend-mg
+  tag: v1
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 3000
+  targetPort: 5000
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  hosts:
+    - host: backend.qtgem.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+env:
+  mongoHost: mongo-service
+  mongoPort: "27017"
+  corsOrigin: "https://qtgem.com,https://www.qtgem.com,http://localhost:3000"
+
+secret:
+  appSecrets:
+    jwtSecret: "my-super-secret-password"
+    groqApiKey: "your-real-groq-api-key-here"
+
+  mongoSecrets:
+    username: root
+    password: root123
+    authDb: admin
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+
+

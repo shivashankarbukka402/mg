@@ -1,0 +1,25 @@
+replicaCount: 2
+
+image:
+  repository: shiva9828/frontend-mg
+  tag: v1
+  pullPolicy: Always
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 80
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  hosts:
+    - host: qtgem.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+env:
+  apiUrl: "http://backend:3000"
