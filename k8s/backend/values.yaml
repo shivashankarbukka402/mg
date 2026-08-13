@@ -22,6 +22,7 @@ ingress:
           pathType: Prefix
 
 env:
+  mongoUri: "mongodb://mongo-service:27017/admin"
   mongoHost: mongo-service
   mongoPort: "27017"
   corsOrigin: "https://qtgem.com,https://www.qtgem.com,http://localhost:3000"
@@ -32,8 +33,8 @@ secret:
     groqApiKey: "your-real-groq-api-key-here"
 
   mongoSecrets:
-    username: root
-    password: root123
+    username: admin
+    password: password
     authDb: admin
 
 resources:
