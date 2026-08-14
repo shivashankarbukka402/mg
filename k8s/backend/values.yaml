@@ -2,7 +2,7 @@ replicaCount: 2
 
 image:
   repository: shiva9828/backend-mg
-  tag: "v1-2"
+  tag: "v1-3"
   pullPolicy: IfNotPresent
 
 service:
