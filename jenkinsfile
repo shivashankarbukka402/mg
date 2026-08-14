@@ -53,7 +53,7 @@ pipeline {
         stage('Backend - Build and Push') {
             steps {
                 script {
-                    dir('./backend') {
+                    dir('server') {
                         backendImage = docker.build("${BACKEND_IMAGE}:${IMAGE_TAG}", "-f Dockerfile .")
                         docker.withRegistry('', "${DOCKER_REGISTRY_CRED_ID}") {
                             backendImage.push()
@@ -66,7 +66,7 @@ pipeline {
         stage('Frontend - Build and Push') {
             steps {
                 script {
-                    dir('./react-app') {
+                    dir('client') {
                         frontendImage = docker.build("${FRONTEND_IMAGE}:${IMAGE_TAG}", "-f Dockerfile .")
                         docker.withRegistry('', "${DOCKER_REGISTRY_CRED_ID}") {
                             frontendImage.push()
