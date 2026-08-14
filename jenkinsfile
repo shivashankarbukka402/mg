@@ -1,0 +1,175 @@
+@Library('main_shared') _
+
+pipeline {
+    agent any
+
+    triggers {
+        githubPush()
+    }
+
+    options {
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(daysToKeepStr: '2'))
+    }
+
+    environment {
+        GIT_URL = 'https://github.com/shivashankarbukka402/mg.git'
+        GIT_BRANCH = 'main'
+        GIT_CREDENTIALS = 'shivashankarbukka402'
+        DOCKER_REGISTRY_CRED_ID = 'shiva9828'
+        SONAR_HOST_URL = 'http://15.206.81.138:9000/'
+        BACKEND_IMAGE = 'shiva9828/backend-mg'
+        FRONTEND_IMAGE = 'shiva9828/frontend-mg'
+        IMAGE_TAG = "v1-${BUILD_NUMBER}"
+        BACKEND_VALUES = 'k8s/backend/values.yaml'
+        FRONTEND_VALUES = 'k8s/frontend/values.yaml'
+    }
+
+    stages {
+        stage('CHECKOUT') {
+            steps {
+                script {
+                    gitcheckout(env.GIT_URL, env.GIT_BRANCH, env.GIT_CREDENTIALS)
+                }
+            }
+        }
+
+        stage('Sonar Code Quality check') {
+            steps {
+                script {
+                    withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
+                        sh """
+                            sonar-scanner \
+                              -Dsonar.projectKey=mg \
+                              -Dsonar.sources=. \
+                              -Dsonar.host.url=${env.SONAR_HOST_URL} \
+                              -Dsonar.token=${SONAR_TOKEN}
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Backend - Build and Push') {
+            steps {
+                script {
+                    dir('./backend') {
+                        backendImage = docker.build("${BACKEND_IMAGE}:${IMAGE_TAG}", "-f Dockerfile .")
+                        docker.withRegistry('', "${DOCKER_REGISTRY_CRED_ID}") {
+                            backendImage.push()
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Frontend - Build and Push') {
+            steps {
+                script {
+                    dir('./react-app') {
+                        frontendImage = docker.build("${FRONTEND_IMAGE}:${IMAGE_TAG}", "-f Dockerfile .")
+                        docker.withRegistry('', "${DOCKER_REGISTRY_CRED_ID}") {
+                            frontendImage.push()
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Trivy Scan - Backend') {
+            steps {
+                sh """
+                    trivy image \
+                    --severity HIGH,CRITICAL \
+                    --format template \
+                    --template '@/home/ubuntu/trivy/trivy_html.tpl' \
+                    --output 'trivy_backend.html' ${BACKEND_IMAGE}:${IMAGE_TAG}
+                """
+            }
+        }
+
+        stage('Trivy Scan - Frontend') {
+            steps {
+                sh """
+                    trivy image \
+                    --severity HIGH,CRITICAL \
+                    --format template \
+                    --template '@/home/ubuntu/trivy/trivy_html.tpl' \
+                    --output 'trivy_frontend.html' ${FRONTEND_IMAGE}:${IMAGE_TAG}
+                """
+            }
+        }
+
+        stage('Update Image Tags in Git') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: env.GIT_CREDENTIALS, usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+                    sh '''
+                        git config user.email "jenkins@ci.local"
+                        git config user.name "Jenkins CI"
+                        sed -i 's|tag: .*|tag: "'"${IMAGE_TAG}"'"|' ${BACKEND_VALUES}
+                        sed -i 's|tag: .*|tag: "'"${IMAGE_TAG}"'"|' ${FRONTEND_VALUES}
+                        git add ${BACKEND_VALUES} ${FRONTEND_VALUES}
+                        git commit -m "ci: update backend and frontend image tag to ${IMAGE_TAG}" || echo "No changes to commit"
+                        git push https://${GIT_USER}:${GIT_PASS}@github.com/shivashankarbukka402/mg.git HEAD:main
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy K8S - Backend') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'argocd-cli-creds', usernameVariable: 'ARGO_USER', passwordVariable: 'ARGO_PASS')]) {
+                        argoAppSyncWithCLI(
+                          appName: 'backend',
+                          argocdHost: 'a36cb6a4112d64058bed52c42ff4c66a-791534585.ap-south-1.elb.amazonaws.com',
+                          username: env.ARGO_USER,
+                          password: env.ARGO_PASS,
+                          insecure: true
+                        )
+                    }
+                }
+            }
+        }
+
+        stage('Deploy K8S - Frontend') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'argocd-cli-creds', usernameVariable: 'ARGO_USER', passwordVariable: 'ARGO_PASS')]) {
+                        argoAppSyncWithCLI(
+                          appName: 'frontend',
+                          argocdHost: 'a36cb6a4112d64058bed52c42ff4c66a-791534585.ap-south-1.elb.amazonaws.com',
+                          username: env.ARGO_USER,
+                          password: env.ARGO_PASS,
+                          insecure: true
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            publishHTML(target: [
+                allowMissing: true,
+                alwaysLinkToLastBuild: false,
+                keepAll: true,
+                reportDir: '',
+                reportFiles: 'trivy_backend.html',
+                reportName: 'Backend Trivy',
+                reportTitles: 'The Report'
+            ])
+            publishHTML(target: [
+                allowMissing: true,
+                alwaysLinkToLastBuild: false,
+                keepAll: true,
+                reportDir: '',
+                reportFiles: 'trivy_frontend.html',
+                reportName: 'Frontend Trivy',
+                reportTitles: 'The Report'
+            ])
+            cleanWs()
+        }
+    }
+}
