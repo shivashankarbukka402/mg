@@ -14,7 +14,7 @@ pipeline {
 
     environment {
         GIT_URL = 'https://github.com/shivashankarbukka402/mg.git'
-        GIT_BRANCH = 'main'
+        GIT_BRANCH = 'Dev'
         GIT_CREDENTIALS = 'shivashankarbukka402'
         DOCKER_REGISTRY_CRED_ID = 'shiva9828'
         SONAR_HOST_URL = 'http://15.206.81.138:9000/'
